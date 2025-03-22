@@ -1,0 +1,41 @@
+{
+  "activeGame": "Counter-Strike 2",
+  "activeModel": "yolov8s.onnx",
+  "captureWidth": 1920,
+  "captureHeight": 1080,
+  "captureRate": 60,
+  "detectionThreshold": 0.5,
+  "enableTracking": true,
+  "assistSettings": {
+    "aimAssistEnabled": false,
+    "triggerBotEnabled": false,
+    "recoilControlEnabled": false,
+    "espEnabled": true,
+    "aimAssistStrength": 0.5,
+    "smoothness": 0.3,
+    "fieldOfView": 10.0
+  },
+  "renderSettings": {
+    "showBoundingBoxes": true,
+    "showLabels": true,
+    "showDistance": true,
+    "showHealth": true,
+    "showHeadPosition": true,
+    "showLines": true,
+    "showCrosshair": true,
+    "showFPS": true,
+    "showDebugInfo": false
+  },
+  "inputSettings": {
+    "aimKey": 2,
+    "triggerKey": 160,
+    "hotkeyMap": {
+      "0": 112,
+      "1": 113,
+      "2": 114,
+      "3": 115,
+      "4": 38,
+      "5": 40
+    }
+  }
+}
