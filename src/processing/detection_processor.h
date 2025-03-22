@@ -29,7 +29,7 @@ public:
 private:
     Entity createEntityFromDetection(const Detection& detection);
     float estimateDistance(const cv::Rect& box, const GameContext& context);
-    Vec3 estimateWorldPosition(const Detection& detection, const GameContext& context);
+    Vec3 estimateWorldPosition(const Entity& entity, const GameContext& context);
     std::vector<TargetInfo> generateTargets(const std::vector<Entity>& entities, const GameContext& context);
     float calculateThreatLevel(const Entity& entity, const GameContext& context);
     

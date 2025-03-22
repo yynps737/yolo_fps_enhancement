@@ -8,9 +8,14 @@ cmake_policy(SET CMP0148 NEW)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# 设置MinGW兼容的OpenCV路径
-set(OpenCV_DIR "C:/opencv-mingw/x64/mingw/lib" CACHE PATH "OpenCV MinGW directory" FORCE)
-message(STATUS "使用MinGW版OpenCV，目录设置为: ${OpenCV_DIR}")
+# 设置OpenCV路径
+if(DEFINED ENV{OpenCV_DIR})
+    set(OpenCV_DIR $ENV{OpenCV_DIR} CACHE PATH "OpenCV directory" FORCE)
+    message(STATUS "使用环境变量中的OpenCV目录: ${OpenCV_DIR}")
+else()
+    set(OpenCV_DIR "C:/opencv-mingw/x64/mingw/lib" CACHE PATH "OpenCV MinGW directory" FORCE)
+    message(STATUS "使用默认MinGW版OpenCV，目录设置为: ${OpenCV_DIR}")
+endif()
 
 # 添加RapidJSON
 include(FetchContent)

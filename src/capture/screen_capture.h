@@ -10,6 +10,11 @@
 #include <windows.h>
 #endif
 
+#ifdef __linux__
+#include <X11/Xlib.h>
+#include <X11/Xutil.h>
+#endif
+
 class ScreenCapture {
 public:
     ScreenCapture(int captureRate = 60);
