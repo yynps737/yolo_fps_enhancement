@@ -1,7 +1,12 @@
 #include "app.h"
 #include "../utils/logger.h"
 #include "../game/cs2_adapter.h"
+#include "../game/valorant_adapter.h"
+#include "../game/battlefield_adapter.h"
+#include "../game/l4d2_adapter.h"
+#include "../game/cod_adapter.h"
 #include <filesystem>
+#include <chrono>
 
 App::App()
     : m_isRunning(false),
@@ -151,8 +156,13 @@ void App::processFrame(const cv::Mat& frame) {
     if (m_showOverlay) {
         cv::Mat overlay = frame.clone();
         m_renderer->renderOverlay(overlay, m_currentGameData);
-        cv::imshow("YOLO FPS辅助", overlay);
-        cv::waitKey(1);
+
+        try {
+            cv::imshow("YOLO FPS辅助", overlay);
+            cv::waitKey(1);
+        } catch (const cv::Exception& e) {
+            Logger::error("渲染异常：" + std::string(e.what()));
+        }
     }
 }
 
@@ -160,6 +170,22 @@ bool App::switchGame(const std::string& gameName) {
     if (gameName == "Counter-Strike 2") {
         m_gameAdapter = std::make_unique<CS2Adapter>();
         Logger::info("加载CS2游戏适配器");
+        return true;
+    } else if (gameName == "Valorant") {
+        m_gameAdapter = std::make_unique<ValorantAdapter>();
+        Logger::info("加载Valorant游戏适配器");
+        return true;
+    } else if (gameName == "Battlefield") {
+        m_gameAdapter = std::make_unique<BattlefieldAdapter>();
+        Logger::info("加载Battlefield游戏适配器");
+        return true;
+    } else if (gameName == "Left 4 Dead 2") {
+        m_gameAdapter = std::make_unique<L4D2Adapter>();
+        Logger::info("加载L4D2游戏适配器");
+        return true;
+    } else if (gameName == "Call of Duty") {
+        m_gameAdapter = std::make_unique<CODAdapter>();
+        Logger::info("加载COD游戏适配器");
         return true;
     }
 
@@ -170,11 +196,26 @@ bool App::switchModel(const std::string& modelName) {
     std::string modelPath = "./models/" + modelName;
     if (!std::filesystem::exists(modelPath)) {
         Logger::error("模型文件不存在：" + modelPath);
+
+        // 尝试查找任何可用的模型
+        auto availableModels = m_modelManager->getAvailableModels();
+        if (!availableModels.empty()) {
+            std::string fallbackModel = "./models/" + availableModels[0].name;
+            Logger::warning("尝试加载备用模型：" + fallbackModel);
+            return m_detector->loadModel(fallbackModel);
+        }
+
         return false;
     }
 
     if (m_detector->loadModel(modelPath)) {
         Logger::info("加载模型：" + modelName);
+
+        // 如果有游戏适配器，更新其类别映射
+        if (m_gameAdapter) {
+            m_processor->setClassMapping(m_gameAdapter->getClassMapping());
+        }
+
         return true;
     }
 
@@ -217,13 +258,4 @@ void App::handleKeyboardInput() {
 
 void App::updateGameContext() {
     m_gameContext.isAiming = m_assistController->isKeyPressed(m_config->getConfig().inputSettings.aimKey);
-}
-
-void App::showSettings() {
-    if (!m_showSettings) {
-        return;
-    }
-
-    // Settings UI would be implemented here if using a UI library
-    // For now, we just display settings in the overlay renderer
 }

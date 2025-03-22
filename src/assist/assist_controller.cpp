@@ -45,6 +45,8 @@ void AssistController::processGameData(const ProcessedGameData& gameData) {
             auto target = selectBestTarget(gameData.potentialTargets);
             applyAimAssist(target);
         }
+    } else {
+        m_aimAssistActive = false;
     }
 
     if (m_settings.triggerBotEnabled && isKeyPressed(m_inputSettings.triggerKey)) {
@@ -64,16 +66,28 @@ void AssistController::processGameData(const ProcessedGameData& gameData) {
             simulateMouseClick(false);
             m_triggerActive = false;
         }
+    } else if (m_triggerActive) {
+        simulateMouseClick(false);
+        m_triggerActive = false;
     }
 }
 
 void AssistController::applyAimAssist(const TargetInfo& target) {
+    if (target.entityId < 0) {
+        return;
+    }
+
     m_currentTarget = target;
+    m_aimAssistActive = true;
 
     float strength = calculateAssistStrength(target);
 
     int deltaX = static_cast<int>(target.aimVector.x * strength);
     int deltaY = static_cast<int>(target.aimVector.y * strength);
+
+    if (std::abs(deltaX) < 1 && std::abs(deltaY) < 1) {
+        return;
+    }
 
     if (m_settings.recoilControlEnabled) {
         deltaY = static_cast<int>(deltaY * m_settings.recoilControlY);
@@ -89,6 +103,10 @@ void AssistController::enableAimAssist(bool enable) {
 
 void AssistController::enableTriggerBot(bool enable) {
     m_settings.triggerBotEnabled = enable;
+    if (!enable && m_triggerActive) {
+        simulateMouseClick(false);
+        m_triggerActive = false;
+    }
 }
 
 void AssistController::enableRecoilControl(bool enable) {
@@ -111,7 +129,7 @@ void AssistController::processInput() {
                     break;
 
                 case HotkeyFunction::ToggleTriggerBot:
-                    m_settings.triggerBotEnabled = !m_settings.triggerBotEnabled;
+                    enableTriggerBot(!m_settings.triggerBotEnabled);
                     break;
 
                 case HotkeyFunction::ToggleESP:
@@ -180,6 +198,7 @@ void AssistController::simulateMouseClick(bool isDown) {
 TargetInfo AssistController::selectBestTarget(const std::vector<TargetInfo>& targets) {
     if (targets.empty()) {
         TargetInfo emptyTarget;
+        emptyTarget.entityId = -1;
         emptyTarget.priority = 0;
         return emptyTarget;
     }

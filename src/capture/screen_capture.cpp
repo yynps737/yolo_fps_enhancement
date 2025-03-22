@@ -70,7 +70,7 @@ double ScreenCapture::getAverageFPS() const {
     }
 
     double avgTime = std::accumulate(m_frameTimes.begin(), m_frameTimes.end(), 0.0) / m_frameTimes.size();
-    return 1000.0 / avgTime;
+    return avgTime > 0 ? 1000.0 / avgTime : 0.0;
 }
 
 void ScreenCapture::captureThreadFunction() {
@@ -105,7 +105,7 @@ void ScreenCapture::captureWithDirectX() {
     int height = m_captureBounds.bottom - m_captureBounds.top;
 
     HBITMAP hbmScreen = CreateCompatibleBitmap(hdcScreen, width, height);
-    SelectObject(hdcMemDC, hbmScreen);
+    HGDIOBJ oldObject = SelectObject(hdcMemDC, hbmScreen);
 
     BitBlt(hdcMemDC, 0, 0, width, height, hdcScreen, m_captureBounds.left, m_captureBounds.top, SRCCOPY);
 
@@ -132,6 +132,7 @@ void ScreenCapture::captureWithDirectX() {
         m_latestFrame = frame;
     }
 
+    SelectObject(hdcMemDC, oldObject);
     DeleteObject(hbmScreen);
     DeleteDC(hdcMemDC);
     ReleaseDC(NULL, hdcScreen);
@@ -145,7 +146,7 @@ void ScreenCapture::captureWithGDI() {
     int height = m_captureBounds.bottom - m_captureBounds.top;
 
     HBITMAP hbmScreen = CreateCompatibleBitmap(hdcScreen, width, height);
-    SelectObject(hdcMemDC, hbmScreen);
+    HGDIOBJ oldObject = SelectObject(hdcMemDC, hbmScreen);
 
     BitBlt(hdcMemDC, 0, 0, width, height, hdcScreen, m_captureBounds.left, m_captureBounds.top, SRCCOPY);
 
@@ -172,6 +173,7 @@ void ScreenCapture::captureWithGDI() {
         m_latestFrame = frame;
     }
 
+    SelectObject(hdcMemDC, oldObject);
     DeleteObject(hbmScreen);
     DeleteDC(hdcMemDC);
     ReleaseDC(NULL, hdcScreen);
