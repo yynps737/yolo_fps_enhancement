@@ -8,6 +8,9 @@ cmake_policy(SET CMP0148 NEW)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+
+set(CMAKE_TOOLCHAIN_FILE "C:/vcpkg/scripts/buildsystems/vcpkg.cmake" CACHE STRING "Vcpkg toolchain file")
+
 # 设置OpenCV路径
 if(DEFINED ENV{OpenCV_DIR})
     set(OpenCV_DIR $ENV{OpenCV_DIR} CACHE PATH "OpenCV directory" FORCE)

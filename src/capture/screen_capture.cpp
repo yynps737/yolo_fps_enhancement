@@ -262,7 +262,7 @@ void ScreenCapture::captureWithOpenGL() {
     m_latestFrame = frame;
 #else
     // 其他平台创建一个空帧
-    cv::Mat frame(m_captureBounds., m_captureBounds.width, CV_8UC3, cv::Scalar(0, 0, 0));
+    cv::Mat frame(m_captureBounds.bottom, m_captureBounds.bottom, CV_8UC3, cv::Scalar(0, 0, 0));
     
     std::lock_guard<std::mutex> lock(m_frameMutex);
     m_latestFrame = frame;
