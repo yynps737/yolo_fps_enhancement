@@ -1,3 +1,5 @@
+#define NOMINMAX
+
 #include "screen_capture.h"
 #include <numeric>
 

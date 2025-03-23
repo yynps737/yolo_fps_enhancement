@@ -1,5 +1,7 @@
+#define NOMINMAX
 #include "tracker.h"
 #include <algorithm>
+#include "../detection/yolo_detector.h"
 
 Tracker::Tracker(int maxLostFrames)
     : m_nextId(0),

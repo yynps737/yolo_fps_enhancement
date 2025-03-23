@@ -5,9 +5,13 @@ project(YOLO_FPS_ASSIST LANGUAGES CXX) # 修改为英文名称
 cmake_policy(SET CMP0146 NEW)
 cmake_policy(SET CMP0148 NEW)
 
+# 添加宏定义避免min/max宏和std::min/max冲突
+add_definitions(-DNOMINMAX)
+# 添加数学定义宏
+add_definitions(-D_USE_MATH_DEFINES)
+
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-
 
 set(CMAKE_TOOLCHAIN_FILE "C:/vcpkg/scripts/buildsystems/vcpkg.cmake" CACHE STRING "Vcpkg toolchain file")
 
@@ -27,6 +31,10 @@ FetchContent_Declare(
         GIT_REPOSITORY https://github.com/Tencent/rapidjson.git
         GIT_TAG v1.1.0
 )
+# 禁用RapidJSON测试和示例以避免与较新C++标准的兼容性问题
+set(RAPIDJSON_BUILD_TESTS OFF CACHE BOOL "Build rapidjson tests" FORCE)
+set(RAPIDJSON_BUILD_EXAMPLES OFF CACHE BOOL "Build rapidjson examples" FORCE)
+set(RAPIDJSON_BUILD_DOC OFF CACHE BOOL "Build rapidjson documentation" FORCE)
 FetchContent_MakeAvailable(rapidjson)
 
 # 查找OpenCV

@@ -1,3 +1,5 @@
+#define NOMINMAX
+
 #include "assist_controller.h"
 #include <cmath>
 

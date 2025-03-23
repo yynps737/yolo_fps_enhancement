@@ -1,3 +1,4 @@
+#define NOMINMAX
 #include "logger.h"
 #include <iostream>
 #include <iomanip>
