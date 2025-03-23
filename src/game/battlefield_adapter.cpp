@@ -198,6 +198,7 @@ void BattlefieldAdapter::identifySoldierClasses(ProcessedGameData& gameData) {
     }
 }
 
+
 void BattlefieldAdapter::processVehicles(ProcessedGameData& gameData) {
     // 处理载具信息
     for (auto& player : gameData.players) {
@@ -220,11 +221,11 @@ SoldierClass BattlefieldAdapter::classifySoldierType(const Entity& entity) {
         return SoldierClass::Engineer;
     } else if (entity.className.find("support") != std::string::npos) {
         return SoldierClass::Support;
-    } else if (entity.className.find("recon") != std::string::npos || 
+    } else if (entity.className.find("recon") != std::string::npos ||
                entity.className.find("sniper") != std::string::npos) {
         return SoldierClass::Recon;
     }
-    
+
     return SoldierClass::Unknown;
 }
 
@@ -244,7 +245,7 @@ VehicleType BattlefieldAdapter::classifyVehicleType(const Entity& entity) {
     } else if (entity.className.find("boat") != std::string::npos) {
         return VehicleType::Boat;
     }
-    
+
     return VehicleType::Unknown;
 }
 
@@ -255,7 +256,7 @@ float BattlefieldAdapter::calculateDistanceScale(const cv::Mat& frame) {
 
 float BattlefieldAdapter::calculateSoldierThreat(const Entity& entity, SoldierClass type) {
     float baseThreat = 10.0f / (entity.estimatedDistance + 1.0f);
-    
+
     switch (type) {
         case SoldierClass::Recon:
             return baseThreat * (entity.estimatedDistance > 50.0f ? 2.0f : 1.2f);
@@ -272,7 +273,7 @@ float BattlefieldAdapter::calculateSoldierThreat(const Entity& entity, SoldierCl
 
 float BattlefieldAdapter::calculateVehicleThreat(const Entity& entity, VehicleType type) {
     float baseThreat = 10.0f / (entity.estimatedDistance + 1.0f);
-    
+
     switch (type) {
         case VehicleType::Tank:
             return baseThreat * 4.0f;

@@ -9,6 +9,10 @@ cmake_policy(SET CMP0148 NEW)
 add_definitions(-DNOMINMAX)
 # 添加数学定义宏
 add_definitions(-D_USE_MATH_DEFINES)
+# 添加UTF-8编码支持
+if(MSVC)
+    add_compile_options("/utf-8")
+endif()
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -43,6 +47,33 @@ message(STATUS "OpenCV库状态:")
 message(STATUS "    版本: ${OpenCV_VERSION}")
 message(STATUS "    包含路径: ${OpenCV_INCLUDE_DIRS}")
 message(STATUS "    库: ${OpenCV_LIBS}")
+
+# 如果使用MinGW版本的OpenCV，需要明确指定库路径
+if(DEFINED OpenCV_LIB_PATH)
+    link_directories(${OpenCV_LIB_PATH})
+else()
+    link_directories(${OpenCV_LIB_DIR})
+    link_directories(${OpenCV_DIR})
+endif()
+
+# 明确列出所有OpenCV库
+set(OpenCV_LIBRARIES
+        opencv_core
+        opencv_imgproc
+        opencv_highgui
+        opencv_imgcodecs
+        opencv_videoio
+        opencv_video
+        opencv_calib3d
+        opencv_dnn
+        opencv_features2d
+        opencv_flann
+        opencv_objdetect
+        opencv_photo
+        opencv_stitching
+        opencv_ml
+        opencv_gapi
+)
 
 # 查找其他可选依赖 - 使用模块方式而非直接查找
 option(WITH_CUDA "Enable CUDA support if available" ON)
@@ -79,6 +110,7 @@ add_executable(${PROJECT_NAME} ${SRC_FILES})
 # 链接库
 target_link_libraries(${PROJECT_NAME}
         ${OpenCV_LIBS}
+        ${OpenCV_LIBRARIES}
 )
 
 if(CUDA_FOUND)

@@ -1,4 +1,3 @@
-#define NOMINMAX
 #include "utils.h"
 #include <algorithm>
 #include <fstream>

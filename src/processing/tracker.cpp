@@ -1,4 +1,3 @@
-#define NOMINMAX
 #include "tracker.h"
 #include <algorithm>
 #include "../detection/yolo_detector.h"
@@ -88,12 +87,6 @@ std::vector<Entity> Tracker::update(const std::vector<Detection>& detections) {
 
                     // 标记检测结果已匹配
                     detectionMatched[bestMatch] = true;
-
-                    // 记录最佳匹配结果
-                    detectionMatched[bestMatch] = true;
-                } else {
-                    // 增加丢失帧计数
-                    trackedObj.lostFrames++;
                 }
 
                 trackedEntities.push_back(trackedObj.entityData);

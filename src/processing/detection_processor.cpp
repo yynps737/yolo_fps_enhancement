@@ -1,5 +1,3 @@
-#define NOMINMAX
-#define _USE_MATH_DEFINES
 #include "detection_processor.h"
 #include <algorithm>
 #include <cmath>

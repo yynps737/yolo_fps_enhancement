@@ -48,5 +48,5 @@ private:
     bool m_isTraining;
     float m_trainingProgress;
     std::thread m_trainingThread;
-    std::mutex m_trainingMutex;
+    mutable std::mutex m_trainingMutex;
 };
