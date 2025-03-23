@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.15)
-project(YOLO_FPS_ASSIST LANGUAGES CXX) # 修改为英文名称
+project(YOLO_FPS_ASSIST LANGUAGES CXX)
 
 # 设置CMake策略
 cmake_policy(SET CMP0146 NEW)
@@ -17,16 +17,10 @@ endif()
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-set(CMAKE_TOOLCHAIN_FILE "C:/vcpkg/scripts/buildsystems/vcpkg.cmake" CACHE STRING "Vcpkg toolchain file")
-
-# 设置OpenCV路径
-if(DEFINED ENV{OpenCV_DIR})
-    set(OpenCV_DIR $ENV{OpenCV_DIR} CACHE PATH "OpenCV directory" FORCE)
-    message(STATUS "使用环境变量中的OpenCV目录: ${OpenCV_DIR}")
-else()
-    set(OpenCV_DIR "C:/opencv-mingw/x64/mingw/lib" CACHE PATH "OpenCV MinGW directory" FORCE)
-    message(STATUS "使用默认MinGW版OpenCV，目录设置为: ${OpenCV_DIR}")
-endif()
+# 设置OpenCV路径 - 使用用户提供的实际安装路径
+set(OpenCV_DIR "C:/opencv/opencv/build" CACHE PATH "OpenCV directory")
+# 设置OpenCV bin目录，用于复制DLL
+set(OpenCV_BIN_DIR "C:/opencv/opencv/build/x64/vc16/bin" CACHE PATH "OpenCV bin directory")
 
 # 添加RapidJSON
 include(FetchContent)
@@ -41,41 +35,17 @@ set(RAPIDJSON_BUILD_EXAMPLES OFF CACHE BOOL "Build rapidjson examples" FORCE)
 set(RAPIDJSON_BUILD_DOC OFF CACHE BOOL "Build rapidjson documentation" FORCE)
 FetchContent_MakeAvailable(rapidjson)
 
-# 查找OpenCV
-find_package(OpenCV REQUIRED)
+# 查找OpenCV - 使用特定的配置路径
+find_package(OpenCV REQUIRED PATHS "${OpenCV_DIR}" NO_DEFAULT_PATH)
+
+# 输出OpenCV库状态
 message(STATUS "OpenCV库状态:")
 message(STATUS "    版本: ${OpenCV_VERSION}")
 message(STATUS "    包含路径: ${OpenCV_INCLUDE_DIRS}")
 message(STATUS "    库: ${OpenCV_LIBS}")
+message(STATUS "    DLL目录: ${OpenCV_BIN_DIR}")
 
-# 如果使用MinGW版本的OpenCV，需要明确指定库路径
-if(DEFINED OpenCV_LIB_PATH)
-    link_directories(${OpenCV_LIB_PATH})
-else()
-    link_directories(${OpenCV_LIB_DIR})
-    link_directories(${OpenCV_DIR})
-endif()
-
-# 明确列出所有OpenCV库
-set(OpenCV_LIBRARIES
-        opencv_core
-        opencv_imgproc
-        opencv_highgui
-        opencv_imgcodecs
-        opencv_videoio
-        opencv_video
-        opencv_calib3d
-        opencv_dnn
-        opencv_features2d
-        opencv_flann
-        opencv_objdetect
-        opencv_photo
-        opencv_stitching
-        opencv_ml
-        opencv_gapi
-)
-
-# 查找其他可选依赖 - 使用模块方式而非直接查找
+# 查找CUDA支持
 option(WITH_CUDA "Enable CUDA support if available" ON)
 if(WITH_CUDA)
     find_package(CUDA QUIET)
@@ -108,10 +78,7 @@ file(GLOB_RECURSE SRC_FILES
 add_executable(${PROJECT_NAME} ${SRC_FILES})
 
 # 链接库
-target_link_libraries(${PROJECT_NAME}
-        ${OpenCV_LIBS}
-        ${OpenCV_LIBRARIES}
-)
+target_link_libraries(${PROJECT_NAME} ${OpenCV_LIBS})
 
 if(CUDA_FOUND)
     target_link_libraries(${PROJECT_NAME} ${CUDA_LIBRARIES})
@@ -133,7 +100,7 @@ add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
 if(WIN32)
     add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_BINARY_DIR}/bin/opencv_dll"
-            COMMAND ${CMAKE_COMMAND} -E copy_directory "${OpenCV_DIR}/../bin" "${CMAKE_BINARY_DIR}/bin/opencv_dll"
+            COMMAND ${CMAKE_COMMAND} -E copy_directory "${OpenCV_BIN_DIR}" "${CMAKE_BINARY_DIR}/bin/opencv_dll"
             COMMENT "复制OpenCV DLL到输出目录"
     )
 
