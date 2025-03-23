@@ -2,6 +2,7 @@
 #include "../utils/logger.h"
 #include <fstream>
 #include <algorithm>
+#include <filesystem>
 
 YoloDetector::YoloDetector(const std::string& modelPath, bool useGPU)
     : m_inputSize(640, 640),
@@ -12,14 +13,10 @@ YoloDetector::YoloDetector(const std::string& modelPath, bool useGPU)
       m_batchEnabled(false)
 {
 #ifdef WITH_ONNX
-    // 初始化ONNX Runtime环境
     m_env = Ort::Env(ORT_LOGGING_LEVEL_WARNING, "YoloDetector");
-
-    // 设置内存信息
     m_memoryInfo = Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault);
 #endif
 
-    // 如果提供了模型路径，加载模型
     if (!modelPath.empty()) {
         loadModel(modelPath);
     }
@@ -33,26 +30,31 @@ YoloDetector::~YoloDetector() {
 
 bool YoloDetector::loadModel(const std::string& modelPath) {
     try {
+        if (!std::filesystem::exists(modelPath)) {
+            Logger::error("模型文件不存在: " + modelPath);
+            return false;
+        }
+
         Logger::info("加载YOLO模型: " + modelPath);
 
 #ifdef WITH_ONNX
-        // 配置ONNX运行时选项
         Ort::SessionOptions sessionOptions;
 
-        // 根据设备类型设置执行提供者
         if (m_deviceType == DeviceType::CUDA) {
             #ifdef WITH_CUDA
-            // 启用CUDA加速
-            OrtCUDAProviderOptions cudaOptions;
-            cudaOptions.device_id = 0;
-            sessionOptions.AppendExecutionProvider_CUDA(cudaOptions);
-            Logger::info("启用CUDA加速");
+            try {
+                OrtCUDAProviderOptions cudaOptions;
+                cudaOptions.device_id = 0;
+                sessionOptions.AppendExecutionProvider_CUDA(cudaOptions);
+                Logger::info("启用CUDA加速");
+            } catch (const Ort::Exception& e) {
+                Logger::warning("CUDA初始化失败，回退到CPU: " + std::string(e.what()));
+            }
             #else
             Logger::warning("CUDA支持未编译，使用CPU执行");
             #endif
         } else if (m_deviceType == DeviceType::DirectML) {
             #ifdef WITH_DIRECTML
-            // 启用DirectML加速
             sessionOptions.AppendExecutionProvider_DML(0);
             Logger::info("启用DirectML加速");
             #else
@@ -60,7 +62,6 @@ bool YoloDetector::loadModel(const std::string& modelPath) {
             #endif
         } else if (m_deviceType == DeviceType::TensorRT) {
             #ifdef WITH_TENSORRT
-            // 启用TensorRT加速
             OrtTensorRTProviderOptions trtOptions;
             sessionOptions.AppendExecutionProvider_TensorRT(trtOptions);
             Logger::info("启用TensorRT加速");
@@ -69,16 +70,12 @@ bool YoloDetector::loadModel(const std::string& modelPath) {
             #endif
         }
 
-        // 启用内存优化
         sessionOptions.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_ALL);
 
-        // 创建会话
         m_session = std::make_unique<Ort::Session>(m_env, modelPath.c_str(), sessionOptions);
 
-        // 获取输入和输出信息
         Ort::AllocatorWithDefaultOptions allocator;
 
-        // 提取输入名称和形状
         size_t numInputNodes = m_session->GetInputCount();
         m_inputNames.resize(numInputNodes);
 
@@ -90,14 +87,12 @@ bool YoloDetector::loadModel(const std::string& modelPath) {
             auto tensorInfo = typeInfo.GetTensorTypeAndShapeInfo();
             m_inputShape = tensorInfo.GetShape();
 
-            // 调整输入尺寸
             if (m_inputShape.size() == 4) {
                 m_inputSize.width = m_inputShape[2];
                 m_inputSize.height = m_inputShape[3];
             }
         }
 
-        // 提取输出名称
         size_t numOutputNodes = m_session->GetOutputCount();
         m_outputNames.resize(numOutputNodes);
 
@@ -106,8 +101,15 @@ bool YoloDetector::loadModel(const std::string& modelPath) {
             m_outputNames[i] = outputName.get();
         }
 
-        // 加载类别名称
         std::string classFile = modelPath.substr(0, modelPath.find_last_of('.')) + ".names";
+        if (!std::filesystem::exists(classFile)) {
+            Logger::warning("类别文件不存在: " + classFile + "，将使用默认类别");
+            std::ofstream emptyClassFile(classFile);
+            if (emptyClassFile.is_open()) {
+                emptyClassFile << "unknown" << std::endl;
+                emptyClassFile.close();
+            }
+        }
         m_classNames = loadClassNames(classFile);
 
         Logger::info("模型加载成功: 输入尺寸=" + std::to_string(m_inputSize.width) + "x" +
@@ -126,9 +128,6 @@ bool YoloDetector::loadModel(const std::string& modelPath) {
 
 std::vector<std::string> YoloDetector::getAvailableModels() const {
     std::vector<std::string> modelFiles;
-
-    // 在实际项目中，这里应该扫描models目录
-    // 简化实现，返回空列表
     return modelFiles;
 }
 
@@ -147,24 +146,19 @@ std::vector<Detection> YoloDetector::detect(const cv::Mat& frame, float confThre
     }
 
     try {
-        // 调整图像大小并进行预处理
         cv::Mat blob;
         cv::dnn::blobFromImage(frame, blob, 1.0 / 255.0, m_inputSize, cv::Scalar(), true, false, CV_32F);
 
-        // 创建输入tensor
         auto memoryInfo = Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault);
         std::vector<float> inputTensorValues(blob.ptr<float>(), blob.ptr<float>() + blob.total());
 
-        // 设置输入维度
         std::vector<int64_t> inputDims = {1, 3, m_inputSize.height, m_inputSize.width};
 
-        // 创建输入tensor
         Ort::Value inputTensor = Ort::Value::CreateTensor<float>(
             memoryInfo, inputTensorValues.data(), inputTensorValues.size(),
             inputDims.data(), inputDims.size()
         );
 
-        // 运行推理
         auto outputTensors = m_session->Run(
             Ort::RunOptions{nullptr},
             m_inputNames.data(),
@@ -174,7 +168,6 @@ std::vector<Detection> YoloDetector::detect(const cv::Mat& frame, float confThre
             m_outputNames.size()
         );
 
-        // 处理输出tensor
         std::vector<cv::Mat> outputs;
 
         for (auto& tensor : outputTensors) {
@@ -182,23 +175,18 @@ std::vector<Detection> YoloDetector::detect(const cv::Mat& frame, float confThre
             auto tensorInfo = typeInfo.GetTensorTypeAndShapeInfo();
             auto dims = tensorInfo.GetShape();
 
-            // 获取tensor数据
             float* data = tensor.GetTensorMutableData<float>();
 
-            // 创建OpenCV Mat并复制数据
             cv::Mat outputMat;
             if (dims.size() == 3) {
-                // YOLOv8输出格式 [1, 84, num_boxes]
                 outputMat = cv::Mat(dims[1], dims[2], CV_32F, data);
             } else if (dims.size() == 2) {
-                // 其他可能的输出格式
                 outputMat = cv::Mat(dims[0], dims[1], CV_32F, data);
             }
 
             outputs.push_back(outputMat);
         }
 
-        // 后处理检测结果
         return postprocess(frame, outputs);
     } catch (const Ort::Exception& e) {
         Logger::error("ONNX运行时异常: " + std::string(e.what()));
@@ -248,7 +236,6 @@ std::vector<std::string> YoloDetector::loadClassNames(const std::string& filenam
         file.close();
     } else {
         Logger::warning("无法打开类别文件: " + filename + "，使用默认类别");
-        // 提供一些默认类别
         classes = {"player", "enemy", "weapon", "item", "utility"};
     }
 
@@ -258,14 +245,12 @@ std::vector<std::string> YoloDetector::loadClassNames(const std::string& filenam
 std::vector<Detection> YoloDetector::postprocess(const cv::Mat& frame, const std::vector<cv::Mat>& outputs) {
     std::vector<Detection> detections;
 
-    // 判断YOLOv8输出格式
     if (outputs.empty()) {
         return detections;
     }
 
     const cv::Mat& output = outputs[0];
 
-    // YOLOv8输出格式为 [num_classes+4, num_boxes]
     int num_classes = output.rows - 4;
     int num_boxes = output.cols;
 
@@ -273,15 +258,12 @@ std::vector<Detection> YoloDetector::postprocess(const cv::Mat& frame, const std
         return detections;
     }
 
-    // 遍历所有检测框
     for (int i = 0; i < num_boxes; i++) {
-        // 框坐标 (x, y, w, h)
         float x = output.at<float>(0, i);
         float y = output.at<float>(1, i);
         float w = output.at<float>(2, i);
         float h = output.at<float>(3, i);
 
-        // 查找最高置信度的类别
         int class_id = 0;
         float max_conf = -1;
 
@@ -293,9 +275,7 @@ std::vector<Detection> YoloDetector::postprocess(const cv::Mat& frame, const std
             }
         }
 
-        // 过滤低置信度检测
         if (max_conf >= m_confThreshold) {
-            // 将normalized box转换为像素坐标
             int img_width = frame.cols;
             int img_height = frame.rows;
 
@@ -304,13 +284,11 @@ std::vector<Detection> YoloDetector::postprocess(const cv::Mat& frame, const std
             int width = static_cast<int>(w * img_width);
             int height = static_cast<int>(h * img_height);
 
-            // 确保坐标在图像范围内
             left = std::max(0, std::min(left, img_width - 1));
             top = std::max(0, std::min(top, img_height - 1));
             width = std::max(1, std::min(width, img_width - left));
             height = std::max(1, std::min(height, img_height - top));
 
-            // 创建检测对象
             Detection det;
             det.boundingBox = cv::Rect(left, top, width, height);
             det.classId = class_id;
@@ -321,7 +299,6 @@ std::vector<Detection> YoloDetector::postprocess(const cv::Mat& frame, const std
         }
     }
 
-    // 应用非极大值抑制
     if (m_nmsEnabled && !detections.empty()) {
         std::vector<int> indices;
         std::vector<cv::Rect> boxes;

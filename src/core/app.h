@@ -4,8 +4,8 @@
 #include <thread>
 #include <atomic>
 #include <opencv2/opencv.hpp>
+#include <mutex>
 
-// 前向声明，避免循环包含
 class Config;
 class ScreenCapture;
 class YoloDetector;
@@ -55,6 +55,7 @@ private:
 
     std::thread m_processingThread;
     std::atomic<bool> m_isRunning;
+    std::mutex m_dataMutex;
 
     GameContext m_gameContext;
 

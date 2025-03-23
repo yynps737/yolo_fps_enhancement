@@ -12,8 +12,6 @@
 #include <rapidjson/istreamwrapper.h>
 #include <rapidjson/ostreamwrapper.h>
 
-// 其余代码保持不变...
-
 Config::Config(const std::string& configFilePath)
     : m_configFilePath(configFilePath)
 {
@@ -207,7 +205,6 @@ bool Config::load() {
     }
 }
 
-// 修复config.cpp文件中的save()函数
 bool Config::save() {
     try {
         rapidjson::Document doc;
@@ -250,17 +247,12 @@ bool Config::save() {
         inputSettings.AddMember("aimKey", m_config.inputSettings.aimKey, allocator);
         inputSettings.AddMember("triggerKey", m_config.inputSettings.triggerKey, allocator);
 
-        // 修复hotkeyMap处理部分
         rapidjson::Value hotkeyMap(rapidjson::kObjectType);
         for (const auto& pair : m_config.inputSettings.hotkeyMap) {
             int functionId = static_cast<int>(pair.first);
             std::string keyStr = std::to_string(functionId);
 
-            // 创建一个临时字符串值作为键
-            rapidjson::Value keyValue;
-            keyValue.SetString(keyStr.c_str(), static_cast<rapidjson::SizeType>(keyStr.length()), allocator);
-
-            // 添加到hotkeyMap
+            rapidjson::Value keyValue(keyStr.c_str(), allocator);
             hotkeyMap.AddMember(keyValue, pair.second, allocator);
         }
 

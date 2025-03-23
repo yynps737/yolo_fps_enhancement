@@ -2,6 +2,8 @@
 
 #include "assist_controller.h"
 #include <cmath>
+#include <cstdlib>
+#include <ctime>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -13,6 +15,8 @@ AssistController::AssistController()
       m_screenCenterX(1920 / 2),
       m_screenCenterY(1080 / 2)
 {
+    std::srand(static_cast<unsigned int>(std::time(nullptr)));
+
     m_settings.aimAssistEnabled = false;
     m_settings.triggerBotEnabled = false;
     m_settings.recoilControlEnabled = false;
@@ -170,8 +174,18 @@ void AssistController::moveMouse(int deltaX, int deltaY, float smoothing) {
         return;
     }
 
-    int finalDeltaX = static_cast<int>(deltaX * (1.0f - smoothing));
-    int finalDeltaY = static_cast<int>(deltaY * (1.0f - smoothing));
+    float smoothFactor = std::min(0.9f, std::max(0.1f, smoothing));
+
+    float strength = 1.0f - smoothFactor;
+    int finalDeltaX = static_cast<int>(deltaX * strength * (0.8f + 0.2f * (std::abs(deltaX) / 100.0f)));
+    int finalDeltaY = static_cast<int>(deltaY * strength * (0.8f + 0.2f * (std::abs(deltaY) / 100.0f)));
+
+    if (std::abs(finalDeltaX) > 3) {
+        finalDeltaX += (std::rand() % 3) - 1;
+    }
+    if (std::abs(finalDeltaY) > 3) {
+        finalDeltaY += (std::rand() % 3) - 1;
+    }
 
     INPUT input;
     ZeroMemory(&input, sizeof(INPUT));

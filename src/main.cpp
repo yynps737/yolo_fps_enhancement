@@ -18,19 +18,26 @@ std::condition_variable g_cv;
 
 void signalHandler(int signal) {
     if (g_app) {
-        Logger::info("收到信号：" + std::to_string(signal) + "，正在关闭应用程序");
-        g_app->stop();
+        Logger::info("收到信号：" + std::to_string(signal) + "，正在安全关闭应用程序");
+        try {
+            g_app->stop();
+        } catch (const std::exception& e) {
+            Logger::error("停止应用时出错: " + std::string(e.what()));
+        }
     }
 
     g_running.store(false);
     g_cv.notify_all();
 
-    Logger::shutdown();
-    exit(signal);
+    try {
+        Logger::shutdown();
+    } catch (...) {
+    }
+
+    std::exit(signal);
 }
 
 #ifndef _WIN32
-// 非Windows平台的退出检测线程
 void exitCheckThread() {
     std::cout << "按 q 然后回车键退出程序" << std::endl;
 
@@ -50,7 +57,6 @@ int main(int argc, char** argv) {
         Logger::initialize("yolo_fps_assist.log");
         Logger::info("应用程序启动");
 
-        // 注册信号处理
         signal(SIGINT, signalHandler);
         signal(SIGTERM, signalHandler);
 
@@ -65,7 +71,6 @@ int main(int argc, char** argv) {
 
         g_app->run();
 
-        // 平台特定的退出检测
 #ifdef _WIN32
         std::cout << "按 F12 退出程序" << std::endl;
 
@@ -78,16 +83,13 @@ int main(int argc, char** argv) {
             }
         }
 #else
-        // 在非Windows平台上使用标准输入来检测退出
         std::thread exitThread(exitCheckThread);
 
-        // 等待退出信号
         {
             std::unique_lock<std::mutex> lock(g_mutex);
             g_cv.wait(lock, []{ return !g_running.load(); });
         }
 
-        // 确保退出检测线程正确退出
         if (exitThread.joinable()) {
             exitThread.join();
         }

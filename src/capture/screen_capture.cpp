@@ -74,8 +74,22 @@ double ScreenCapture::getAverageFPS() const {
 }
 
 void ScreenCapture::captureThreadFunction() {
+    const double targetFrameTime = 1000.0 / m_captureRate;
+    std::chrono::high_resolution_clock::time_point lastFrameTime = std::chrono::high_resolution_clock::now();
+
     while (m_isRunning.load()) {
         auto startTime = std::chrono::high_resolution_clock::now();
+
+        auto timeSinceLastFrame = std::chrono::duration_cast<std::chrono::milliseconds>(
+            startTime - lastFrameTime).count();
+
+        if (timeSinceLastFrame < targetFrameTime) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(
+                static_cast<int>(targetFrameTime - timeSinceLastFrame)));
+            continue;
+        }
+
+        lastFrameTime = startTime;
 
 #ifdef _WIN32
         captureWithDirectX();
@@ -90,9 +104,6 @@ void ScreenCapture::captureThreadFunction() {
         if (m_frameTimes.size() > 100) {
             m_frameTimes.erase(m_frameTimes.begin());
         }
-
-        int sleepTime = std::max(0, 1000 / m_captureRate - static_cast<int>(duration));
-        std::this_thread::sleep_for(std::chrono::milliseconds(sleepTime));
     }
 }
 
@@ -182,12 +193,9 @@ void ScreenCapture::captureWithGDI() {
 
 void ScreenCapture::captureWithOpenGL() {
 #ifdef __linux__
-    // Linux下的屏幕捕获实现
     try {
-        // 这里使用X11或XCB实现屏幕捕获
         Display* display = XOpenDisplay(nullptr);
         if (!display) {
-            // 如果无法打开显示，创建一个空帧
             cv::Mat frame(m_captureBounds.height, m_captureBounds.width, CV_8UC3, cv::Scalar(0, 0, 0));
 
             std::lock_guard<std::mutex> lock(m_frameMutex);
@@ -204,17 +212,13 @@ void ScreenCapture::captureWithOpenGL() {
         int width = m_captureBounds.width;
         int height = m_captureBounds.height;
 
-        // 确保区域在屏幕范围内
         if (width <= 0) width = attributes.width;
         if (height <= 0) height = attributes.height;
 
-        // 捕获屏幕
         XImage* img = XGetImage(display, root, x, y, width, height, AllPlanes, ZPixmap);
         if (img) {
-            // 转换为OpenCV格式
             cv::Mat frame(height, width, CV_8UC4);
 
-            // 复制像素数据
             for (int j = 0; j < height; j++) {
                 for (int i = 0; i < width; i++) {
                     unsigned long pixel = XGetPixel(img, i, j);
@@ -225,43 +229,34 @@ void ScreenCapture::captureWithOpenGL() {
                 }
             }
 
-            // 转换颜色空间
             cv::cvtColor(frame, frame, cv::COLOR_RGBA2RGB);
 
-            // 更新最新帧
             {
                 std::lock_guard<std::mutex> lock(m_frameMutex);
                 m_latestFrame = frame;
             }
 
-            // 释放XImage
             XDestroyImage(img);
         } else {
-            // 如果捕获失败，创建一个空帧
             cv::Mat frame(height, width, CV_8UC3, cv::Scalar(0, 0, 0));
 
             std::lock_guard<std::mutex> lock(m_frameMutex);
             m_latestFrame = frame;
         }
 
-        // 关闭显示连接
         XCloseDisplay(display);
     } catch (const std::exception& e) {
-        // 异常处理：创建一个空帧
         cv::Mat frame(m_captureBounds.height, m_captureBounds.width, CV_8UC3, cv::Scalar(0, 0, 0));
 
         std::lock_guard<std::mutex> lock(m_frameMutex);
         m_latestFrame = frame;
     }
 #elif defined(__APPLE__)
-    // macOS下的屏幕捕获实现
-    // 注意：这里仅是占位符，实际实现需要使用macOS特定的API
     cv::Mat frame(m_captureBounds.height, m_captureBounds.width, CV_8UC3, cv::Scalar(0, 0, 0));
 
     std::lock_guard<std::mutex> lock(m_frameMutex);
     m_latestFrame = frame;
 #else
-    // 其他平台创建一个空帧
     cv::Mat frame(m_captureBounds.bottom, m_captureBounds.bottom, CV_8UC3, cv::Scalar(0, 0, 0));
     
     std::lock_guard<std::mutex> lock(m_frameMutex);

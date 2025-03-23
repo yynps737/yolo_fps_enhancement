@@ -7,6 +7,7 @@
 #include "../game/cod_adapter.h"
 #include <filesystem>
 #include <chrono>
+#include <mutex>
 
 App::App()
     : m_isRunning(false),
@@ -136,26 +137,49 @@ void App::processFrame(const cv::Mat& frame) {
         return;
     }
 
-    auto& appConfig = m_config->getConfig();
+    auto localConfig = m_config->getConfig();
+    auto localContext = m_gameContext;
+
     updateGameContext();
 
     if (m_gameAdapter) {
         m_gameAdapter->analyzeMapContext(frame);
     }
 
-    std::vector<Detection> detections = m_detector->detect(frame, appConfig.detectionThreshold);
-
-    m_currentGameData = m_processor->processDetections(detections, m_gameContext);
-
-    if (m_gameAdapter) {
-        m_gameAdapter->processGameSpecific(m_currentGameData);
+    std::vector<Detection> detections;
+    try {
+        detections = m_detector->detect(frame, localConfig.detectionThreshold);
+    } catch (const std::exception& e) {
+        Logger::error("检测过程发生异常: " + std::string(e.what()));
+        return;
     }
 
-    m_assistController->processGameData(m_currentGameData);
+    ProcessedGameData localGameData;
+    try {
+        localGameData = m_processor->processDetections(detections, localContext);
+    } catch (const std::exception& e) {
+        Logger::error("处理检测结果发生异常: " + std::string(e.what()));
+        return;
+    }
+
+    if (m_gameAdapter) {
+        try {
+            m_gameAdapter->processGameSpecific(localGameData);
+        } catch (const std::exception& e) {
+            Logger::error("游戏特定处理发生异常: " + std::string(e.what()));
+        }
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(m_dataMutex);
+        m_currentGameData = localGameData;
+    }
+
+    m_assistController->processGameData(localGameData);
 
     if (m_showOverlay) {
         cv::Mat overlay = frame.clone();
-        m_renderer->renderOverlay(overlay, m_currentGameData);
+        m_renderer->renderOverlay(overlay, localGameData);
 
         try {
             cv::imshow("YOLO FPS辅助", overlay);
@@ -197,7 +221,6 @@ bool App::switchModel(const std::string& modelName) {
     if (!std::filesystem::exists(modelPath)) {
         Logger::error("模型文件不存在：" + modelPath);
 
-        // 尝试查找任何可用的模型
         auto availableModels = m_modelManager->getAvailableModels();
         if (!availableModels.empty()) {
             std::string fallbackModel = "./models/" + availableModels[0].name;
@@ -211,7 +234,6 @@ bool App::switchModel(const std::string& modelName) {
     if (m_detector->loadModel(modelPath)) {
         Logger::info("加载模型：" + modelName);
 
-        // 如果有游戏适配器，更新其类别映射
         if (m_gameAdapter) {
             m_processor->setClassMapping(m_gameAdapter->getClassMapping());
         }
